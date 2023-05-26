@@ -2,7 +2,7 @@ dubbo:
   application:
     name: dubbo-springboot-demo-provider
   protocol:
-    name: dubbo
+    name: tri
     port: -1
   registry:
     address: nacos://localhost:8848
