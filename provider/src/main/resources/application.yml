@@ -1,0 +1,20 @@
+server:
+  port: 6324
+dubbo:
+  application:
+    name: dubbo-nacos-provider
+    register-mode: all
+  protocol:
+    name: dubbo
+    port: -1
+  registry:
+    id: nacos-registry
+    address: nacos://192.168.0.137:8848
+    username: nacos
+    password: nacos
+    parameters:
+      namespace: 6cd00e00-7657-49f3-b97a-51e56c30f1ff
+      group: dubbo-demo
+
+  config-center:
+    timeout: 12000
