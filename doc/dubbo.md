@@ -61,3 +61,127 @@ Dubbo的主要节点角色
 
 ![image-20240509103927448](https://pic-go-image.oss-cn-beijing.aliyuncs.com/pic/image-20240509103927448.png)
 
+## 异步化实践
+
+```java
+@DubboService
+public class AsyncOrderFacadeImpl implements AsyncOrderFacade {
+    private static final Executor threadPool = Executors.newFixedThreadPool(8);
+
+    @Override
+    public OrderInfo queryOrderById(String id) {
+        // 模拟执行一段耗时的业务逻辑
+        try {
+            Thread.sleep(5000);
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+        OrderInfo resultInfo =
+                new OrderInfo(
+                        "GeekDubbo",
+                        Thread.currentThread().getName() + "#服务方异步方式之RpcContext.startAsync#" + id,
+                        new BigDecimal(129));
+        return resultInfo;
+    }
+
+    //使用CompletableFuture实现异步
+    @Override
+    public CompletableFuture<OrderInfo> queryOrderByIdFuture(String id) {
+        return CompletableFuture.supplyAsync(
+                () -> {
+                    try {
+                        Thread.sleep(5000);
+                        OrderInfo resultInfo =
+                                new OrderInfo(
+                                        "GeekDubbo",
+                                        Thread.currentThread().getName()
+                                                + "#服务方异步方式之RpcContext.startAsync#"
+                                                + id,
+                                        new BigDecimal(129));
+                        return resultInfo;
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                    }
+                    return null;
+                });
+    }
+
+    //使用AsyncContext实现异步
+    @Override
+    public OrderInfo queryOrderByIdAsyncContext(String id) {
+        AsyncContext asyncContext = RpcContext.startAsync();
+        threadPool.execute(
+                () -> {
+                    asyncContext.signalContextSwitch();
+                    try {
+                        Thread.sleep(5000);
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                    }
+                    asyncContext.write(
+                            new OrderInfo(
+                                    "GeekDubbo",
+                                    Thread.currentThread().getName()
+                                            + "#服务方异步方式之RpcContext.startAsync#"
+                                            + id,
+                                    new BigDecimal(129)));
+                });
+        return null;
+    }
+}
+```
+
+**如果 queryOrderById 这个方法的调用量上来了，很容易导致 Dubbo 线程池耗尽。**(Dubbo线程池默认线程数200)
+
+- **Provider异步**
+
+  - 使用CompletableFuture实现异步
+  - 使用AsyncContext实现异步
+
+- **Consumer异步**
+
+  ```java
+  @RestController
+  @RequestMapping("/demo")
+  public class DemoController {
+      @DubboReference(timeout = 10000)
+      private AsyncOrderFacade asyncOrderFacade;
+  
+          // Consumer异步调用
+          CompletableFuture<OrderInfo> future =
+                  CompletableFuture.supplyAsync(
+                          () -> {
+                              return asyncOrderFacade.queryOrderById(id);
+                          });
+          future.whenComplete(
+                  (v, t) -> {
+                      if (t != null) {
+                          t.printStackTrace();
+                      } else {
+                          System.out.println("Response: " + JSON.toJSONString(v));
+                      }
+                  });
+          return JSON.toJSONString(future.get());
+      }
+  }
+  ```
+
+### Dubbo异步实现原理
+
+1. 开启异步模式：
+
+   org.apache.dubbo.rpc.RpcContext#startAsync，通过CAS的方式创建了一个CompletableFuture对象，存储在当前的上下文RpcContextAttachment对象中
+
+2. 在异步线程中同步父线程的上下文信息：
+
+   org.apache.dubbo.rpc.AsyncContextImpl#signalContextSwitch，把asyncContext对象传入到子线程，然后将asyncContext中的上下文信息充分拷贝到子线程中。
+
+3. 将异步结果写入到异步线程的上下文信息中：
+
+   org.apache.dubbo.rpc.AsyncContextImpl#write，异步化结果存入了CompletableFuture对象中，拦截处只需要调用CompletableFuture#get(long timeout, TimeUnit unit) 就能拿到异步化结果了。
+
+### 异步运用场景
+
+1. 异步化耗时的操作并没有在queryOrderById方法所在线程中继续占用资源，而是在新开辟的线程池中占用资源。**对于一些IO耗时的操作，比较影响客户体验和使用性能的一些地方**。
+2. queryOrderById开启异步操作后就立即返回了，异步线程的完成与否，不太影响 queryOrderById 的返回操作。**若某段业务逻辑开启异步执行后不太影响主线程的原有业务逻辑**。
+3. 在 queryOrderById中，只开启了一个异步化的操作，站在时序的角度上看，queryOrderById 方法返回了，但是异步化的逻辑还在慢慢执行着，对时序的先后顺序没有严格要求。**时序上没有严格要求的业务逻辑**。
