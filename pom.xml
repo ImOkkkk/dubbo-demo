@@ -12,6 +12,8 @@
     <module>provider</module>
     <module>interface</module>
     <module>consumer</module>
+    <module>provider2</module>
+    <module>base</module>
   </modules>
 
   <properties>

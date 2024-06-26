@@ -8,6 +8,8 @@ import com.imokkkk.model.OrderInfo;
 import org.apache.dubbo.common.constants.ClusterRules;
 import org.apache.dubbo.common.constants.LoadbalanceRules;
 import org.apache.dubbo.config.annotation.DubboReference;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -24,6 +26,8 @@ import java.util.concurrent.ExecutionException;
 @RestController
 @RequestMapping("/demo")
 public class DemoController {
+    private static final Logger logger = LoggerFactory.getLogger(DemoController.class);
+
     @DubboReference(
             timeout = 3000,
             retries = 3,
@@ -31,7 +35,7 @@ public class DemoController {
             loadbalance = LoadbalanceRules.ROUND_ROBIN)
     private DemoService demoService;
 
-    @DubboReference(timeout = 10000)
+    @DubboReference(timeout = 100000)
     private AsyncOrderFacade asyncOrderFacade;
 
     // http://127.0.0.1:6325/demo/print?str=hello
@@ -63,7 +67,7 @@ public class DemoController {
                     if (t != null) {
                         t.printStackTrace();
                     } else {
-                        System.out.println("Response: " + JSON.toJSONString(v));
+                        logger.info("Response: " + JSON.toJSONString(v));
                     }
                 });
         return JSON.toJSONString(future.get());

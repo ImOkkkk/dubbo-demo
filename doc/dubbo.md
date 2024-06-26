@@ -185,3 +185,28 @@ public class AsyncOrderFacadeImpl implements AsyncOrderFacade {
 1. 异步化耗时的操作并没有在queryOrderById方法所在线程中继续占用资源，而是在新开辟的线程池中占用资源。**对于一些IO耗时的操作，比较影响客户体验和使用性能的一些地方**。
 2. queryOrderById开启异步操作后就立即返回了，异步线程的完成与否，不太影响 queryOrderById 的返回操作。**若某段业务逻辑开启异步执行后不太影响主线程的原有业务逻辑**。
 3. 在 queryOrderById中，只开启了一个异步化的操作，站在时序的角度上看，queryOrderById 方法返回了，但是异步化的逻辑还在慢慢执行着，对时序的先后顺序没有严格要求。**时序上没有严格要求的业务逻辑**。
+
+## 隐式传递
+
+RpcContext
+
+- ServiceContext：在Dubbo内部使用，用于传递调用链路上的参数信息，如invoker对象等
+- **ClientAttachment**：在Client端使用，往ClientAttachment中写入的参数将被传递到Server端
+- **ServerAttachment**：在Server端使用，从ServerAttachment中读取的参数是从Client中传递过来的
+- ServerContext：在Client端和Server端使用，用于从Server端回传Client端使用，Server端写入到ServerContext的参数在调用结束后可以在Client端ServerContext获取到
+
+1. Dubbo系统调用时，想传递一些通用参数，可通过Dubbo提供的扩展如Filter等实现统一的参数传递
+2. Dubbo系统调用时，想传递接口定义之外的参数，可在调用接口前使用setAttachment传递参数
+
+### 定义过滤器的步骤
+
+1. 实现org.apache.dubbo.rpc.Filter接口
+2. @Activate 注解标识是提供方维度的过滤器，还是消费方维度的 过滤器
+3. 重写invoke方法，提供方过滤器从invocation取出traceId并设置到ClientAttachment、MDC中，消费方过滤器从ClientAttachment取出traceId并设置到invoation中；
+4. 最后将自定义的类路径添加到META-INF/dubbo/org.apache.dubbo.rpc.Filter 文件中，并取个别名。
+
+### 应用场景
+
+1. 传递请求流水号，分布式应用中通过流水号全局检索日志。
+2. 传递用户信息，不同系统在处理业务逻辑时获取用户层面的信息。
+3. 传递凭证信息，如Cookie、Token等。
