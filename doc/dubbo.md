@@ -186,6 +186,12 @@ public class AsyncOrderFacadeImpl implements AsyncOrderFacade {
 2. queryOrderById开启异步操作后就立即返回了，异步线程的完成与否，不太影响 queryOrderById 的返回操作。**若某段业务逻辑开启异步执行后不太影响主线程的原有业务逻辑**。
 3. 在 queryOrderById中，只开启了一个异步化的操作，站在时序的角度上看，queryOrderById 方法返回了，但是异步化的逻辑还在慢慢执行着，对时序的先后顺序没有严格要求。**时序上没有严格要求的业务逻辑**。
 
+### CompletableFuture
+
+- 任务执行完成后再并发执行其他任务：thenXxxAsync
+- 合并两个线程任务的结果，并做进一步累加和处理：thenCombine
+- 两个线程任务并发执行，谁先执行完成就以谁为准：applyToEither
+
 ## 隐式传递
 
 RpcContext
@@ -210,3 +216,27 @@ RpcContext
 1. 传递请求流水号，分布式应用中通过流水号全局检索日志。
 2. 传递用户信息，不同系统在处理业务逻辑时获取用户层面的信息。
 3. 传递凭证信息，如Cookie、Token等。
+
+### RpcContext生命周期
+
+- **SERVER_LOCAL**：作用于Provider侧，在org.apache.dubbo.rpc.RpcContext.RestoreContext#restore 中被设置进去，即在线程切换将父线程的信息拷贝至子线程时被调用，然而却又在 Provider 转为 Consumer 角色时被清除数据。
+- **CLIENT_ATTACHMENT**：用于将附属信息作为 Consumer 传递到下一跳 Provider，在 Provider 和 Consumer 的 Filter 中的 org.apache.dubbo.rpc.BaseFilter.Listener#onResponse、 org.apache.dubbo.rpc.BaseFilter.Listener#onError 方法都会被清除数据。
+- **SERVER_ATTACHMENT**：SERVER_ATTACHMENT 作为 Provider 侧用于接收上一跳 Consumer 的发来附属信息，在 Provider 和 Consumer 的 Filter 中的 org.apache.dubbo.rpc.BaseFilter.Listener#onResponse、 org.apache.dubbo.rpc.BaseFilter.Listener#onError 方法都会被清除数据。
+- **SERVICE_CONTEXT**：SERVICE_CONTEXT 用于将附属信息作为 Provider 返回给 Consumer，在 Provider 侧的 org.apache.dubbo.rpc.filter.ContextFilter#onResponse、 org.apache.dubbo.rpc.filter.ContextFilter#onError 方法都会被清除数据。
+
+## 泛化调用
+
+采用一种统一的方式来发起对任何服务方法的调用。
+
+### 应用场景
+
+- **透式调用**：发起方只是想调用提供者拿到结果，没有过多的业务逻辑诉求，即使有，
+  也是拿到结果后再继续做分发处理。
+- **代理服务**：所有的请求都会经过代理服务器，而代理服务器不会感知任何业务逻辑，只 是一个通道，接收数据 -> 发起调用 -> 返回结果，调用流程非常简单纯粹。
+- **前端网关**：前端网关，有些内网环境的运营页面，对 URL 的格式没有那么严格的讲究，页面的功 能都是和后端服务一对一的操作，非常简单直接。
+
+**如何获取下游接口对象**
+
+@DubboReference
+
+![image-20240720094202498](https://pic-go-image.oss-cn-beijing.aliyuncs.com/pic/image-20240720094202498.png)
