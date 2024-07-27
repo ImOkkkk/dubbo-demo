@@ -32,6 +32,14 @@
       <groupId>ognl</groupId>
       <artifactId>ognl</artifactId>
     </dependency>
+    <dependency>
+      <groupId>org.codehaus.groovy</groupId>
+      <artifactId>groovy-all</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>cn.hutool</groupId>
+      <artifactId>hutool-all</artifactId>
+    </dependency>
 
   </dependencies>
 

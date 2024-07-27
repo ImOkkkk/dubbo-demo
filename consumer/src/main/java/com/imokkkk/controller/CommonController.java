@@ -8,6 +8,7 @@ import org.apache.dubbo.config.RegistryConfig;
 import org.apache.dubbo.config.bootstrap.DubboBootstrap;
 import org.apache.dubbo.remoting.exchange.Response;
 import org.apache.dubbo.rpc.service.GenericService;
+import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -48,7 +49,7 @@ public class CommonController {
      */
     private Response commonInvoke(
             String className, String mtdName, String parameterTypeName, String requestBody) {
-        ReferenceConfig<GenericService> referenceConfig = createReferenceConfig(className);
+        ReferenceConfig<GenericService> referenceConfig = createReferenceConfig(className, null);
         GenericService genericService = referenceConfig.get();
         Object resp =
                 genericService.$invoke(
@@ -66,7 +67,7 @@ public class CommonController {
         return response;
     }
 
-    private static ReferenceConfig<GenericService> createReferenceConfig(String className) {
+    public static ReferenceConfig<GenericService> createReferenceConfig(String className, String url) {
         DubboBootstrap dubboBootstrap = DubboBootstrap.getInstance();
         // 设置应用服务名称
         ApplicationConfig applicationConfig = new ApplicationConfig();
@@ -83,6 +84,9 @@ public class CommonController {
         referenceConfig.setGeneric(true);
         // 设置默认超时时间
         referenceConfig.setTimeout(5 * 1000);
+        if (StringUtils.hasText(url)) {
+            referenceConfig.setUrl(url);
+        }
         return referenceConfig;
     }
 }

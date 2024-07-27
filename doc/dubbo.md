@@ -232,11 +232,78 @@ RpcContext
 
 - **透式调用**：发起方只是想调用提供者拿到结果，没有过多的业务逻辑诉求，即使有，
   也是拿到结果后再继续做分发处理。
-- **代理服务**：所有的请求都会经过代理服务器，而代理服务器不会感知任何业务逻辑，只 是一个通道，接收数据 -> 发起调用 -> 返回结果，调用流程非常简单纯粹。
-- **前端网关**：前端网关，有些内网环境的运营页面，对 URL 的格式没有那么严格的讲究，页面的功 能都是和后端服务一对一的操作，非常简单直接。
+- **代理服务**：所有的请求都会经过代理服务器，而代理服务器不会感知任何业务逻辑，只是一个通道，接收数据 -> 发起调用 -> 返回结果，调用流程非常简单纯粹。
+- **前端网关**：前端网关，有些内网环境的运营页面，对 URL 的格式没有那么严格的讲究，页面的功能都是和后端服务一对一的操作，非常简单直接。
 
 **如何获取下游接口对象**
 
 @DubboReference
 
 ![image-20240720094202498](https://pic-go-image.oss-cn-beijing.aliyuncs.com/pic/image-20240720094202498.png)
+
+### 泛化调用三部曲
+
+- 接口类名、接口方法名、接口方法参数类名、业务请求参数。
+- 根据接口类名创建 ReferenceConfig 对象，设置 **generic = true 、url = 协议 +IP+PORT** 两个重要属性，调用 referenceConfig.get 拿到 genericService 泛化对象。
+- 传入接口方法名、接口方法参数类名、业务请求参数，调用 genericService.$invoke 方法拿到响应对象，并通过 Ognl 表达式语言判断响应成功或失败，然后完成数据最终返回。
+
+## 点点直连：万能修复接口
+
+**ReferenceConfigBase**
+
+```java
+//org.apache.dubbo.config.ReferenceConfig#parseUrl
+	private void parseUrl(Map<String, String> referenceParameters) {
+    		//将配置的url地址按照分号进行切割，得到一个字符串数组
+        String[] us = SEMICOLON_SPLIT_PATTERN.split(url);
+        if (ArrayUtils.isNotEmpty(us)) {
+            for (String u : us) {
+              	//主要逻辑
+                URL url = URL.valueOf(u);
+                if (StringUtils.isEmpty(url.getPath())) {
+                    url = url.setPath(interfaceName);
+                }
+                url = url.setScopeModel(getScopeModel());
+                url = url.setServiceModel(consumerModel);
+                if (UrlUtils.isRegistry(url)) {
+                    urls.add(url.putAttribute(REFER_KEY, referenceParameters));
+                } else {
+                    URL peerUrl = getScopeModel().getApplicationModel().getBeanFactory().getBean(ClusterUtils.class).mergeUrl(url, referenceParameters);
+                    peerUrl = peerUrl.putAttribute(PEER_KEY, true);
+                    urls.add(peerUrl);
+                }
+            }
+        }
+    }
+
+		//org.apache.dubbo.common.URLStrParser#parseEncodedStr
+    public static URL parseEncodedStr(String encodedURLStr) {
+        Map<String, String> parameters = null;
+        int pathEndIdx = encodedURLStr.toUpperCase().indexOf("%3F");// '?'
+        if (pathEndIdx >= 0) {
+            parameters = parseEncodedParams(encodedURLStr, pathEndIdx + 3);
+        } else {
+            pathEndIdx = encodedURLStr.length();
+        }
+
+        //decodedBody format: [protocol://][username:password@][host:port]/[path]
+        String decodedBody = decodeComponent(encodedURLStr, 0, pathEndIdx, false, DECODE_TEMP_BUF.get());
+        return parseURLBody(encodedURLStr, decodedBody, parameters);
+    }
+```
+
+赋值 url 为**dubbo://[机器IP结点]:[机器IP提供Dubbo服务的端口]**
+
+![CleanShot 2024-07-24 at 22.17.46@2x](https://pic-go-image.oss-cn-beijing.aliyuncs.com/pic/CleanShot%202024-07-24%20at%2022.17.46%402x.png)
+
+### 应用场景
+
+1. 修复产线事件，通过直连 + 泛化 + 动态代码编译执行，可以轻松临时解决产线棘手的问题。
+2. 绕过注册中心直接联调测试，有些公司由于测试环境的复杂性，有时候不得不采用简单的直连方式，来快速联调测试验证功能。
+3. 检查服务存活状态，如果需要针对多台机器进行存活检查，那就需要循环调用所有服务的存活检查接口。
+
+### 动态编译调用三部曲
+
+- 将 Java 代码利用 Groovy 插件的 groovyClassLoader 加载器编译为 Class 对象。
+- 将 Class 信息创建 Bean 定义对象后，移交给 Spring 容器去创建单例 Bean 对象。
+- 调用单例 Bean 对象的 run 方法，完成动态代码调用。
