@@ -307,3 +307,96 @@ RpcContext
 - 将 Java 代码利用 Groovy 插件的 groovyClassLoader 加载器编译为 Class 对象。
 - 将 Class 信息创建 Bean 定义对象后，移交给 Spring 容器去创建单例 Bean 对象。
 - 调用单例 Bean 对象的 run 方法，完成动态代码调用。
+
+## 事件通知
+
+![CleanShot 2024-07-28 at 17.05.43@2x](https://pic-go-image.oss-cn-beijing.aliyuncs.com/pic/CleanShot%202024-07-28%20at%2017.05.43%402x.png)
+
+```java
+@DubboService
+@Component
+public class PayFacadeImpl implements PayFacade {
+	// 商品支付功能:一个大方法
+	@Override
+	public PayResp recvPay(PayReq req){
+		// 支付核心业务逻辑处理 
+		method1();
+		// 埋点已支付的商品信息
+		method2();
+		// 发送支付成功短信给用户
+		method3();
+		// 通知物流派件
+ 		method4();
+		// 返回支付结果
+		return buildSuccResp();
+	}
+}
+```
+
+**解耦技巧**
+
+1. 功能相关性：将一些功能非常相近的汇聚成一块。
+2. 密切相关性：按照与主流程的密切相关性，将一个个小功能分为密切与非密切。
+3. 状态变更性：按照是否有明显业务状态的先后变更，将一个个小功能再归类。
+
+![CleanShot 2024-07-28 at 17.06.37@2x](https://pic-go-image.oss-cn-beijing.aliyuncs.com/pic/CleanShot%202024-07-28%20at%2017.06.37%402x.png)
+
+事件驱动，简单理解就是**一个事件会触发另一个或多个事件做出对应的响应行为**。
+
+**反射调用，在接口级别配置回调方法**
+
+![CleanShot 2024-07-28 at 17.46.22@2x](https://pic-go-image.oss-cn-beijing.aliyuncs.com/pic/CleanShot%202024-07-28%20at%2017.46.22%402x.png)
+
+```java
+@Activate(group = CommonConstants.CONSUMER)
+public class FutureFilter implements ClusterFilter, ClusterFilter.Listener {
+
+    protected static final ErrorTypeAwareLogger logger = LoggerFactory.getErrorTypeAwareLogger(FutureFilter.class);
+
+    @Override
+    public Result invoke(final Invoker<?> invoker, final Invocation invocation) throws RpcException {
+        fireInvokeCallback(invoker, invocation);
+        // need to configure if there's return value before the invocation in order to help invoker to judge if it's
+        // necessary to return future.
+        return invoker.invoke(invocation);
+    }
+
+    @Override
+    public void onResponse(Result result, Invoker<?> invoker, Invocation invocation) {
+        if (result.hasException()) {
+            fireThrowCallback(invoker, invocation, result.getException());
+        } else {
+            fireReturnCallback(invoker, invocation, result.getValue());
+        }
+    }
+
+    @Override
+    public void onError(Throwable t, Invoker<?> invoker, Invocation invocation) {
+        fireThrowCallback(invoker, invocation, t);
+    }
+}
+```
+
+**FutureFilter 过滤器**
+
+- 在 invoker.invoke(invocation) 方法之前，利用 fireInvokeCallback 方法反射调用了接口配置中指定服务中的 onInvoke 方法。
+- 然后在 onResponse 响应时，处理了正常返回和异常返回的逻辑，分别调用了接口配置中指定服务中的 onReturn、onThrow 方法。
+- 最后在 onError 框架异常后，调用了接口配置中指定服务中的  onThrow 方法
+
+### 常用的事件回调机制
+
+- Spring 框架，使用 publishEvent 方法发布 ApplicationEvent 事件。
+- Tomcat 框架，在 Javax 规范的 ServletContainerInitializer.onStartup 方法中继续循环回调ServletContextInitializer 接口的所有实现类。
+-  JVM 的关闭钩子事件，当程序正常退出或调用 System.exit 或虚拟机被关闭时，会调用Runtime.addShutdownHook 注册的线程。
+
+### 事件通知的应用
+
+- **职责分离**，可以按照功能相关性剥离开，让各自的逻辑是内聚的、职责分明的。
+- **解耦**，把复杂的面向过程风格的一坨代码分离，可以按照功能是技术属性还是业务属性剥离。
+- **事件溯源**，针对一些事件的实现逻辑，如果遇到未知异常后还想再继续尝试重新执行的话，可以考虑事件持久化并支持在一定时间内重新回放执行。
+
+### Dubbo事件通知三部曲
+
+1. 创建一个服务类，在该类中添加 onInvoke、onReturn、onThrow 三个方法。
+2. 其次，在三个方法中按照源码 FutureFilter 的规则定义好方法入参。
+3. 最后，@DubboReference 注解中给需要关注事件的 Dubbo 接口添加配置即可。
