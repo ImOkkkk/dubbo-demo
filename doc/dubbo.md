@@ -400,3 +400,75 @@ public class FutureFilter implements ClusterFilter, ClusterFilter.Listener {
 1. 创建一个服务类，在该类中添加 onInvoke、onReturn、onThrow 三个方法。
 2. 其次，在三个方法中按照源码 FutureFilter 的规则定义好方法入参。
 3. 最后，@DubboReference 注解中给需要关注事件的 Dubbo 接口添加配置即可。
+
+**Dubbo 框架的事件通知机制，即使有重试机制的存在，但也只会触发一次。**
+
+## 参数验证
+
+**ValidationFilter**
+
+```java
+    //org.apache.dubbo.validation.filter.ValidationFilter#invoke
+		@Override
+    public Result invoke(Invoker<?> invoker, Invocation invocation) throws RpcException {
+      //Validation 接口的代理类被注入成功，且该调用的方法有 validation 属性
+        if (validation != null && !invocation.getMethodName().startsWith("$")
+            && ConfigUtils.isNotEmpty(invoker.getUrl().getMethodParameter(invocation.getMethodName(), VALIDATION_KEY))) {
+            try {
+              // 接着通过 url 中 validation 属性值，并且为该方法创建对应的校验实现类
+                Validator validator = validation.getValidator(invoker.getUrl());
+              // 若找到校验实现类的话，则真正开启对方法的参数进行校验
+                if (validator != null) {
+                    validator.validate(invocation.getMethodName(), invocation.getParameterTypes(), invocation.getArguments());
+                }
+            } catch (RpcException e) {
+                throw e;
+            } catch (Throwable t) {
+                return AsyncRpcResult.newDefaultAsyncResult(t, invocation);
+            }
+        }
+      // 能来到这里，说明要么没有配置校验过滤器，要么就是校验了但参数都合法 // 既然没有抛异常的话，那么就直接调用下一个过滤器的逻辑
+        return invoker.invoke(invocation);
+    }
+
+		//org.apache.dubbo.validation.support.AbstractValidation#getValidator
+    @Override
+    public Validator getValidator(URL url) {
+        String key = url.toFullString();
+      	//validators 是一个 Map 结构，即底层可以说明每个方法都可以有不同的校验器
+        Validator validator = validators.get(key);
+        if (validator == null) {
+            validators.put(key, createValidator(url));
+            validator = validators.get(key);
+        }
+        return validator;
+    }
+
+  //org.apache.dubbo.validation.support.jvalidation.JValidator
+	public class JValidator implements Validator {
+    // 进入到 Dubbo 框架默认的校验器中，发现真实采用的是 javax 第三方的 validation 插件 
+    private final javax.validation.Validator validator;
+  }
+```
+
+1. 先找到ValidationFilter过滤器的invoke入口
+2. 紧接着找到根据validation属性值创建校验器的createValidator方法
+3. 然后发现创建了一个JValidator对象
+4. 在该对象中发现了关于javax包名的第三方validation插件
+
+### 参数验证的应用
+
+- 单值简单规则验证，各个字段的校验逻辑毫无关联、相互独立
+- 提前拦截脏请求，尽可能把一些参数值不合法的情况提前过滤掉
+- 通用网关领域，对于不合法的请求尽量拦截掉，避免不必要的请求打到下游，浪费资源
+
+### 两种方式
+
+- 一般方式，设置validation为jvalidation、jvalidationNew两种框架提供的值
+- 特殊方式，设置validation为自定义校验器的类路径，并将自定义的类路径添加到META-INF文件夹下面的org.apache.dubbo.validation.Validation 文件中
+
+### 参数校验三部曲
+
+1. 寻找具有拦截机制的接口，且该接口具有读取请求对象数据的能力
+2. 寻找一套注解来定义校验的标准规则，并将该注解修饰到请求对象的字段上
+3. 寻找一套校验逻辑来根据注解的标准规则来校验字段值，提供通用的校验能力

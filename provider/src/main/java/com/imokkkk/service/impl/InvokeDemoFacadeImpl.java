@@ -2,6 +2,9 @@ package com.imokkkk.service.impl;
 
 import com.imokkkk.DemoService;
 import com.imokkkk.facade.InvokeDemoFacade;
+import com.imokkkk.facade.ValidationFacade;
+import com.imokkkk.model.ValidateUserInfo;
+
 import org.apache.dubbo.config.annotation.DubboReference;
 import org.apache.dubbo.config.annotation.Method;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -14,6 +17,9 @@ import org.springframework.stereotype.Component;
  */
 @Component
 public class InvokeDemoFacadeImpl implements InvokeDemoFacade {
+
+    @DubboReference(validation = "jvalidation")
+    private ValidationFacade validationFacade;
 
     @Autowired
     @DubboReference(
@@ -35,5 +41,10 @@ public class InvokeDemoFacadeImpl implements InvokeDemoFacade {
     // 简单的一个 hello 方法，然后内部调用下游Dubbo接口 DemoFacade 的 sayHello 方法
     public String hello(String str) {
         return demoService.print(str);
+    }
+
+    // 一个简单的触发调用下游 ValidationFacade.validateUser 的方法
+    public String invokeValidate(String id, String name, String sex) {
+        return validationFacade.validateUser(new ValidateUserInfo(id, name, sex));
     }
 }
