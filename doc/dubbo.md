@@ -472,3 +472,130 @@ public class FutureFilter implements ClusterFilter, ClusterFilter.Listener {
 1. 寻找具有拦截机制的接口，且该接口具有读取请求对象数据的能力
 2. 寻找一套注解来定义校验的标准规则，并将该注解修饰到请求对象的字段上
 3. 寻找一套校验逻辑来根据注解的标准规则来校验字段值，提供通用的校验能力
+
+## 为接口提供缓存
+
+### CacheFilter
+
+```java
+//过滤器被触发的调用入口
+org.apache.dubbo.cache.filter.CacheFilter#invoke
+↓
+//根据invoker.getUrl()获取缓存容器
+org.apache.dubbo.cache.support.AbstractCacheFactory#getCache
+↓
+//若缓存容器没有的话，则自动创建一个缓存容器
+org.apache.dubbo.cache.support.AbstractCacheFactory#createCache
+↓
+//最终创建的是一个 LruCache 对象，该对象的内部使用的 LRU2Cache 存储数据
+org.apache.dubbo.cache.support.lru.LruCache#LruCache
+//存储调用结果的对象
+    private final Map<Object, Object> store;
+    public LruCache(URL url) {
+        final int max = url.getParameter("cache.size", 1000);
+        this.store = new LRU2Cache<>(max);
+    }
+//LRU2Cache 的带参构造方法，在 LruCache 构造方法中，默认传入的大小是 1000
+↓
+//若继续放数据时，若发现现有数据个数大于 maxCapacity 最大容量的话
+//则会考虑抛弃掉最古老的一个，也就是会抛弃最早进入缓存的那个对象
+    @Override
+    protected boolean removeEldestEntry(java.util.Map.Entry<K, V> eldest) {
+        return size() > maxCapacity;
+    }
+↓
+//JDK 中的 LinkedHashMap 源码在发生节点插入后
+//给了子类一个扩展删除最旧数据的机制
+java.util.HashMap#afterNodeInsertion
+    void afterNodeInsertion(boolean evict) { // possibly remove eldest
+        LinkedHashMap.Entry<K,V> first;
+        if (evict && (first = head) != null && removeEldestEntry(first)) {
+            K key = first.key;
+            removeNode(hash(key), key, null, false, true);
+        }
+    }
+```
+
+### 缓存策略
+
+- lru
+- threadlocal：使用的是 ThreadLocalCacheFactory 工厂类，类名中 ThreadLocal 是本地线 程的意思，而 ThreadLocal 最终还是使用的是 JVM 内存。
+- jcache：使用的是 JCacheFactory 工厂类，是提供 javax-spi 缓存实例的工厂类，既然是一 种 **spi 机制**，可以接入很多自制的开源框架。
+- expiring：使用的是 ExpiringCacheFactory 工厂类，内部的 ExpiringCache 中还是使用的 Map 数据结构来存储数据，仍然使用的是 JVM 内存。
+
+### jcache
+
+```java
+javax.cache.Caching.CachingProviderRegistry#getCachingProvider(java.lang.ClassLoader)
+    public CachingProvider getCachingProvider(ClassLoader classLoader) {
+  		//获取所有 CachingProvider 接口的所有实现类
+  		//如果配置了javax.cache.spi.CachingProvider系统属性，那就用loadClass方法加载实现类
+  		//否则通过 ServiceLoader.load JDK 的 SPI 机制进行加载所有的 CachingProvider 实现类
+      Iterator<CachingProvider> iterator = getCachingProviders(classLoader).iterator();
+			//迭代开始循环所有的实现类
+      if (iterator.hasNext()) {
+        //取出第一个实现类
+        CachingProvider provider = iterator.next();
+				//然后再尝试看看是否还有第二个实现类
+        if (iterator.hasNext()) {
+          //如果有第二个实现类，则直接抛出多个缓存提供者的异常
+          throw new CacheException("Multiple CachingProviders have been configured when only a single CachingProvider is expected");
+        } else {
+          //如果没有第二个实现类，那么就直接使用第一个实现类
+					//也就意味着，当前系统在运行时只允许有一个实现类去实现 CachingProvider 接口
+          return provider;
+        }
+      } else {
+        throw new CacheException("No CachingProviders have been configured");
+      }
+    }
+```
+
+**Redisson**
+
+```java
+org.redisson.jcache.JCachingProvider#loadConfig
+    private Config loadConfig(URI uri) {
+        Config config = null;
+        try {
+            URL yamlUrl = null;
+            if (DEFAULT_URI_PATH.equals(uri.getPath())) {
+                //尝试加载 /redisson-jcache.yaml 配置文件
+                yamlUrl = JCachingProvider.class.getResource("/redisson-jcache.yaml");
+            } else {
+                yamlUrl = uri.toURL();
+            }
+            if (yamlUrl != null) {
+                //最终转成 org.redisson.config.Config 对象
+                config = Config.fromYAML(yamlUrl);
+            } else {
+                //若没有 /redisson-jcache.yaml 配置文件则抛出文件不存在的异常
+                throw new FileNotFoundException("/redisson-jcache.yaml");
+            }
+        } catch (JsonProcessingException e) {
+            throw new CacheException(e);
+        } catch (IOException e) {
+            try {
+                URL jsonUrl = null;
+                if (DEFAULT_URI_PATH.equals(uri.getPath())) {
+                    //尝试加载 /redisson-jcache.json 配置文件
+                    jsonUrl = JCachingProvider.class.getResource("/redisson-jcache.json");
+                } else {
+                    jsonUrl = uri.toURL();
+                }
+                if (jsonUrl != null) {
+                    config = Config.fromJSON(jsonUrl);
+                }
+            } catch (IOException ex) {
+                // skip
+            }
+        }
+        return config;
+    }
+```
+
+### 应用场景
+
+- 数据库缓存，对于从数据库查询出来的数据，如果多次查询变化差异较小的话，可以按照一定的维度缓存起来，减少访问数据库的次数，为数据库减压。
+- 业务层缓存，对于一些聚合的业务逻辑，执行时间过长或调用次数太多，而又可以容忍一段时间内数据的差异性，也可以考虑采取一定的维度缓存起来。
+

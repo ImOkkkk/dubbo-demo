@@ -28,6 +28,7 @@
     <ognl.version>3.4.3</ognl.version>
     <groovy-all.version>2.4.8</groovy-all.version>
     <hutool-all.version>5.8.26</hutool-all.version>
+    <redisson.version>3.24.3</redisson.version>
   </properties>
 
   <dependencyManagement>
@@ -78,6 +79,12 @@
         <groupId>cn.hutool</groupId>
         <artifactId>hutool-all</artifactId>
         <version>${hutool-all.version}</version>
+      </dependency>
+
+      <dependency>
+        <groupId>org.redisson</groupId>
+        <artifactId>redisson</artifactId>
+        <version>${redisson.version}</version>
       </dependency>
     </dependencies>
   </dependencyManagement>
