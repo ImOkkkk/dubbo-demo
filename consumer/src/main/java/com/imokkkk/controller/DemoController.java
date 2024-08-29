@@ -3,8 +3,12 @@ package com.imokkkk.controller;
 import com.alibaba.fastjson2.JSON;
 import com.imokkkk.DemoService;
 import com.imokkkk.facade.AsyncOrderFacade;
+import com.imokkkk.facade.InvokeCacheFacade;
+import com.imokkkk.facade.InvokeDemoFacade;
+import com.imokkkk.facade.ValidationFacade;
 import com.imokkkk.model.OrderInfo;
 
+import com.imokkkk.model.ValidateUserInfo;
 import org.apache.dubbo.common.constants.ClusterRules;
 import org.apache.dubbo.common.constants.LoadbalanceRules;
 import org.apache.dubbo.config.annotation.DubboReference;
@@ -35,6 +39,16 @@ public class DemoController {
             loadbalance = LoadbalanceRules.ROUND_ROBIN)
     private DemoService demoService;
 
+    @DubboReference
+    private InvokeDemoFacade invokeDemoFacade;
+
+    @DubboReference
+    private ValidationFacade validationFacade;
+
+    @DubboReference
+    private InvokeCacheFacade invokeCacheFacade;
+
+
     @DubboReference(timeout = 100000)
     private AsyncOrderFacade asyncOrderFacade;
 
@@ -42,6 +56,24 @@ public class DemoController {
     @GetMapping("/print")
     public String print(@RequestParam("str") String str) {
         return demoService.print(str);
+    }
+
+    @GetMapping("/print1")
+    public String print1(@RequestParam("str") String str) {
+        return invokeDemoFacade.hello(str);
+    }
+
+    @GetMapping("/print2")
+    public String print2() {
+        ValidateUserInfo validateUserInfo = new ValidateUserInfo();
+        validateUserInfo.setName("AA");
+        return validationFacade.validateUser(validateUserInfo);
+    }
+
+    @GetMapping("/print3")
+    public String print3() {
+        invokeCacheFacade.invokeCache();
+        return "SUCCESS";
     }
 
     // http://127.0.0.1:6325/demo/queryOrderById?id=1&async=true

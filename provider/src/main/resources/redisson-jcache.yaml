@@ -1,0 +1,8 @@
+singleServerConfig:
+  address: redis://0.0.0.0:6379
+  password: Deviskaifa123!
+  connectionPoolSize: 100
+  connectionMinimumIdleSize: 10
+  idleConnectionTimeout: 10000
+
+codec: !<org.redisson.codec.JsonJacksonCodec> {}

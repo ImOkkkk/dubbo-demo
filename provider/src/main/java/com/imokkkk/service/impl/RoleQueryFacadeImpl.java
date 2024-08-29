@@ -3,6 +3,7 @@ package com.imokkkk.service.impl;
 import com.imokkkk.facade.RoleQueryFacade;
 
 import org.apache.dubbo.config.annotation.DubboService;
+import org.apache.dubbo.config.annotation.Method;
 import org.springframework.stereotype.Component;
 
 /**
@@ -10,7 +11,14 @@ import org.springframework.stereotype.Component;
  * @date 2024/8/11 11:30
  * @since 1.0
  */
-@DubboService
+
+// 配合限流过滤器而添加的限流参数 qps.enable、qps.value
+@DubboService(
+        methods = {
+            @Method(
+                    name = "queryRoleList",
+                    parameters = {"qps.enable", "true", "qps.value", "3"})
+        })
 @Component
 public class RoleQueryFacadeImpl implements RoleQueryFacade {
 

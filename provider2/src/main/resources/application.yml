@@ -9,7 +9,7 @@ dubbo:
     port: -1
   registry:
     id: nacos-registry
-    address: nacos://192.168.0.137:8848
+    address: nacos://0.0.0.0:8848
     username: nacos
     password: nacos
     parameters:

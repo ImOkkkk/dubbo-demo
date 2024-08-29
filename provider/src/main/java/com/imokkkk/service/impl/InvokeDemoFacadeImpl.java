@@ -6,6 +6,7 @@ import com.imokkkk.facade.ValidationFacade;
 import com.imokkkk.model.ValidateUserInfo;
 
 import org.apache.dubbo.config.annotation.DubboReference;
+import org.apache.dubbo.config.annotation.DubboService;
 import org.apache.dubbo.config.annotation.Method;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
@@ -16,6 +17,7 @@ import org.springframework.stereotype.Component;
  * @since 1.0
  */
 @Component
+@DubboService
 public class InvokeDemoFacadeImpl implements InvokeDemoFacade {
 
     @DubboReference(validation = "jvalidation")
@@ -28,17 +30,17 @@ public class InvokeDemoFacadeImpl implements InvokeDemoFacade {
             /** 启动时不检查 DemoFacade 是否能正常提供服务 * */
             check = false,
 
-            /** 为 DemoFacade 的 sayHello 方法设置事件通知机制 * */
+            /** 为 DemoFacade 的 print 方法设置事件通知机制 * */
             methods = {
                 @Method(
-                        name = "sayHello",
+                        name = "print",
                         oninvoke = "eventNotifyService.onInvoke",
                         onreturn = "eventNotifyService.onReturn",
                         onthrow = "eventNotifyService.onThrow")
             })
     private DemoService demoService;
 
-    // 简单的一个 hello 方法，然后内部调用下游Dubbo接口 DemoFacade 的 sayHello 方法
+    // 简单的一个 hello 方法，然后内部调用下游Dubbo接口 DemoFacade 的 print 方法
     public String hello(String str) {
         return demoService.print(str);
     }

@@ -14,7 +14,7 @@ public class DemoServiceImpl implements DemoService {
     @Override
     public String print(String str) {
         try {
-            Thread.sleep(4_000);
+            Thread.sleep(200);
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
         }

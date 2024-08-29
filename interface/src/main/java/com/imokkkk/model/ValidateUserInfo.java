@@ -1,5 +1,6 @@
 package com.imokkkk.model;
 
+import java.io.Serializable;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -14,7 +15,7 @@ import org.hibernate.validator.constraints.NotBlank;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class ValidateUserInfo {
+public class ValidateUserInfo implements Serializable {
     // 添加了 @NotBlank 注解
     @NotBlank(message = "id 不能为空")
     private String id;
