@@ -29,7 +29,8 @@ public class InvokeCacheFacadeImpl implements InvokeCacheFacade {
     @DubboReference(cache = "lru")
     private MenuQueryFacade menuQueryFacade;
 
-    @DubboReference(cache = "jcache")
+//    @DubboReference(cache = "jcache")
+    @DubboReference
     private RoleQueryFacade roleQueryFacade;
 
     // 定义的一个线程池，来模拟网关接收了很多请求

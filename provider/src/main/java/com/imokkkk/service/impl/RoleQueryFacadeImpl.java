@@ -17,7 +17,7 @@ import org.springframework.stereotype.Component;
         methods = {
             @Method(
                     name = "queryRoleList",
-                    parameters = {"qps.enable", "true", "qps.value", "3"})
+                    parameters = {"qps.enable", "true", "qps.value", "3", "qps.type", "rlimit"})
         })
 @Component
 public class RoleQueryFacadeImpl implements RoleQueryFacade {
