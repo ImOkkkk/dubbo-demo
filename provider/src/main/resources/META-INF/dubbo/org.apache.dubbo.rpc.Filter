@@ -1,3 +1,5 @@
 customLimitFilter2=com.imokkkk.filter.CustomLimitFilter2
 customCacheFilter=com.imokkkk.filter.CustomCacheFilter
+providerTokenFilter=com.imokkkk.filter.ProviderTokenFilter
+providerVerifySignFilter=com.imokkkk.filter.ProviderVerifySignFilter
 

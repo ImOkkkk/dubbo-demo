@@ -27,7 +27,7 @@ import java.io.Serializable;
 public class CustomCacheFilter implements Filter {
     private CacheFactory cacheFactory;
 
-    public CustomCacheFilter(CacheFactory cacheFactory) {
+    public void setCacheFactory(CacheFactory cacheFactory) {
         this.cacheFactory = cacheFactory;
     }
 

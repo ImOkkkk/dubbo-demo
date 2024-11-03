@@ -1,0 +1,2 @@
+consumerTokenFilter=com.imokkkk.filter.ConsumerTokenFilter
+consumerAddSignFilter=com.imokkkk.filter.ConsumerAddSignFilter

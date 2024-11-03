@@ -1,0 +1,16 @@
+spring:
+  application:
+    name: dubbo-nacos-provider
+  cloud:
+    nacos:
+      discovery:
+        server-addr: 0.0.0.0:8848
+        username: nacos
+        password: nacos
+      config:
+        server-addr: 0.0.0.0:8848
+        username: nacos
+        password: nacos
+        file-extension: yaml
+        group: DEFAULT_GROUP
+        prefix: ${spring.application.name}

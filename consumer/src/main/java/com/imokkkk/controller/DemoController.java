@@ -6,6 +6,7 @@ import com.imokkkk.facade.AsyncOrderFacade;
 import com.imokkkk.facade.InvokeCacheFacade;
 import com.imokkkk.facade.InvokeDemoFacade;
 import com.imokkkk.facade.ValidationFacade;
+import com.imokkkk.facade.impl.InvokeAuthFacadeImpl;
 import com.imokkkk.model.OrderInfo;
 
 import com.imokkkk.model.ValidateUserInfo;
@@ -14,6 +15,8 @@ import org.apache.dubbo.common.constants.LoadbalanceRules;
 import org.apache.dubbo.config.annotation.DubboReference;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -52,6 +55,9 @@ public class DemoController {
     @DubboReference(timeout = 100000)
     private AsyncOrderFacade asyncOrderFacade;
 
+    @Autowired
+    private InvokeAuthFacadeImpl invokeAuthFacade;
+
     // http://127.0.0.1:6325/demo/print?str=hello
     @GetMapping("/print")
     public String print(@RequestParam("str") String str) {
@@ -73,6 +79,11 @@ public class DemoController {
     @GetMapping("/print3")
     public String print3() {
         invokeCacheFacade.invokeCache();
+        return "SUCCESS";
+    }
+    @GetMapping("/auth1")
+    public String auth1() {
+        invokeAuthFacade.invokeAuth();
         return "SUCCESS";
     }
 
