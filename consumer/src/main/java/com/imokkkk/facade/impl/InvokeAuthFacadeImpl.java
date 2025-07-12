@@ -3,8 +3,7 @@ package com.imokkkk.facade.impl;
 import com.imokkkk.facade.InvokeAuthFacade;
 import com.imokkkk.facade.PayAccountFacade;
 
-import org.apache.dubbo.config.annotation.DubboReference;
-import org.apache.dubbo.config.annotation.Method;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 /**
@@ -14,13 +13,7 @@ import org.springframework.stereotype.Service;
  */
 @Service
 public class InvokeAuthFacadeImpl implements InvokeAuthFacade {
-    @DubboReference(
-            timeout = 10000,
-            methods = {
-                @Method(
-                        name = "queryPayAccount",
-                        parameters = {"auth.token", "123456789"})
-            })
+    @Autowired
     private PayAccountFacade payAccountFacade;
 
     @Override
