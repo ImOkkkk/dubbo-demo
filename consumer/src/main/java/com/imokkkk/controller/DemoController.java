@@ -8,15 +8,15 @@ import com.imokkkk.facade.InvokeDemoFacade;
 import com.imokkkk.facade.ValidationFacade;
 import com.imokkkk.facade.impl.InvokeAuthFacadeImpl;
 import com.imokkkk.model.OrderInfo;
-
 import com.imokkkk.model.ValidateUserInfo;
+import com.imokkkk.utils.RemoteCallWrapper;
+
 import org.apache.dubbo.common.constants.ClusterRules;
 import org.apache.dubbo.common.constants.LoadbalanceRules;
 import org.apache.dubbo.config.annotation.DubboReference;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -42,21 +42,16 @@ public class DemoController {
             loadbalance = LoadbalanceRules.ROUND_ROBIN)
     private DemoService demoService;
 
-    @DubboReference
-    private InvokeDemoFacade invokeDemoFacade;
+    @DubboReference private InvokeDemoFacade invokeDemoFacade;
 
-    @DubboReference
-    private ValidationFacade validationFacade;
+    @DubboReference private ValidationFacade validationFacade;
 
-    @DubboReference
-    private InvokeCacheFacade invokeCacheFacade;
-
+    @DubboReference private InvokeCacheFacade invokeCacheFacade;
 
     @DubboReference(timeout = 100000)
     private AsyncOrderFacade asyncOrderFacade;
 
-    @Autowired
-    private InvokeAuthFacadeImpl invokeAuthFacade;
+    @Autowired private InvokeAuthFacadeImpl invokeAuthFacade;
 
     // http://127.0.0.1:6325/demo/print?str=hello
     @GetMapping("/print")
@@ -73,7 +68,12 @@ public class DemoController {
     public String print2() {
         ValidateUserInfo validateUserInfo = new ValidateUserInfo();
         validateUserInfo.setName("AA");
-        return validationFacade.validateUser(validateUserInfo);
+        String validateUserResponse =
+                RemoteCallWrapper.call(
+                        req -> validationFacade.validateUser(req),
+                        validateUserInfo,
+                        "validateUser");
+        return validateUserResponse;
     }
 
     @GetMapping("/print3")
@@ -81,6 +81,7 @@ public class DemoController {
         invokeCacheFacade.invokeCache();
         return "SUCCESS";
     }
+
     @GetMapping("/auth1")
     public String auth1() {
         invokeAuthFacade.invokeAuth();
@@ -92,12 +93,12 @@ public class DemoController {
     public String queryOrderById(
             @RequestParam("id") String id, @RequestParam("async") Boolean async)
             throws ExecutionException, InterruptedException {
-//        OrderInfo orderInfo =
-//                async
-//                        // ? asyncOrderFacade.queryOrderByIdFuture(id).get()
-//                        ? asyncOrderFacade.queryOrderByIdAsyncContext(id)
-//                        : asyncOrderFacade.queryOrderById(id);
-//        return JSON.toJSONString(orderInfo);
+        //        OrderInfo orderInfo =
+        //                async
+        //                        // ? asyncOrderFacade.queryOrderByIdFuture(id).get()
+        //                        ? asyncOrderFacade.queryOrderByIdAsyncContext(id)
+        //                        : asyncOrderFacade.queryOrderById(id);
+        //        return JSON.toJSONString(orderInfo);
 
         // Consumer异步调用
         CompletableFuture<OrderInfo> future =
